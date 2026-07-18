@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Replication Simulator</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        @keyframes pulse-flow {
+            0% { stroke-dashoffset: 24; }
+            100% { stroke-dashoffset: 0; }
+        }
+        .replicating-path {
+            stroke-dasharray: 8;
+            animation: pulse-flow 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Header Navigation -->
+    <header class="border-b border-slate-800 bg-slate-950/50 backdrop-blur px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 text-white p-2 rounded-lg">
+                <i class="fa-solid fa-database text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight">DB-ReplicaSim</h1>
+                <p class="text-xs text-slate-400">Project Simulasi Replikasi Database</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <span class="text-xs bg-indigo-500/10 text-indigo-400 px-3 py-1.5 rounded-full border border-indigo-500/20 font-medium">
+                Mata Kuliah: Scalable Systems Design
+            </span>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 p-6">
+        
+        <!-- Control Panel (Sidebar) -->
+        <div class="lg:col-span-1 bg-slate-950/40 border border-slate-800 rounded-2xl p-5 flex flex-col gap-6">
+            <div>
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">1. Pilih Mode Replikasi</h2>
+                <div class="flex flex-col gap-2">
+                    <button id="btn-ms-sync" onclick="switchMode('ms-sync')" class="w-full text-left p-3 rounded-xl border transition flex items-start gap-3 bg-indigo-600/10 border-indigo-500 text-indigo-300">
+                        <i class="fa-solid fa-rotate text-lg mt-0.5"></i>
+                        <div>
+                            <div class="font-semibold text-sm">Master-Slave (Sync)</div>
+                            <div class="text-xs text-slate-400 mt-0.5">Konsistensi tinggi, transaksi menunggu Slave ACK.</div>
+                        </div>
+                    </button>
+                    <button id="btn-ms-async" onclick="switchMode('ms-async')" class="w-full text-left p-3 rounded-xl border border-slate-800 hover:border-slate-700 transition flex items-start gap-3 text-slate-300">
+                        <i class="fa-solid fa-bolt-lightning text-lg mt-0.5"></i>
+                        <div>
+                            <div class="font-semibold text-sm">Master-Slave (Async)</div>
+                            <div class="text-xs text-slate-400 mt-0.5">Performa kilat, replikasi di latar belakang (lag).</div>
+                        </div>
+                    </button>
+                    <button id="btn-mm-async" onclick="switchMode('mm-async')" class="w-full text-left p-3 rounded-xl border border-slate-800 hover:border-slate-700 transition flex items-start gap-3 text-slate-300">
+                        <i class="fa-solid fa-arrows-left-right text-lg mt-0.5"></i>
+                        <div>
+                            <div class="font-semibold text-sm">Master-Master (Async)</div>
+                            <div class="text-xs text-slate-400 mt-0.5">Multi-write node, rawan konflik data.</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <hr class="border-slate-800">
+
+            <!-- Simulator Actions -->
+            <div>
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">2. Operasi Database</h2>
+                
+                <!-- Write operation form -->
+                <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-800/80 mb-4">
+                    <label class="block text-xs text-slate-400 mb-1 font-medium">Target Node Tulis</label>
+                    <select id="write-target" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-slate-300 focus:outline-none focus:border-indigo-500 mb-3">
+                        <option value="master1">Master DB (Primary)</option>
+                        <option value="master2" disabled>Master 2 (Hanya untuk Master-Master)</option>
+                    </select>
+
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Kunci (Key)</label>
+                            <input type="text" id="write-key" value="stok_laptop" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-slate-200 code-font focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Nilai (Value)</label>
+                            <input type="number" id="write-value" value="15" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-sm text-slate-200 code-font focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <button onclick="executeWrite()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm p-2.5 rounded-lg transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20">
+                        <i class="fa-solid fa-pen-to-square"></i> Kirim Transaksi Tulis
+                    </button>
+                </div>
+
+                <!-- Simulation parameters -->
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between text-xs text-slate-400 mb-1">
+                            <span>Replication Lag (Delay)</span>
+                            <span id="lag-val" class="text-indigo-400 font-semibold">1.5 detik</span>
+                        </div>
+                        <input type="range" id="param-lag" min="0.2" max="5.0" step="0.1" value="1.5" oninput="updateLagLabel(this.value)" class="w-full accent-indigo-500">
+                    </div>
+
+                    <!-- Server controls -->
+                    <div class="bg-slate-900/40 p-3 rounded-lg border border-slate-800 text-xs space-y-2">
+                        <div class="font-semibold text-slate-400 mb-1 text-[10px] uppercase tracking-wider">Kontrol Fisik Server</div>
+                        <div class="flex justify-between items-center">
+                            <span>Master Primary (Node 1)</span>
+                            <button id="btn-toggle-m1" onclick="toggleNode('master1')" class="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 font-medium">ONLINE</button>
+                        </div>
+                        <div id="control-m2" class="flex justify-between items-center opacity-40 pointer-events-none">
+                            <span>Master Secondary (Node 2)</span>
+                            <button id="btn-toggle-m2" onclick="toggleNode('master2')" class="px-2 py-1 rounded bg-slate-800 text-slate-400 hover:bg-slate-700 font-medium">OFFLINE</button>
+                        </div>
+                        <div id="control-s1" class="flex justify-between items-center">
+                            <span>Slave DB 1</span>
+                            <button id="btn-toggle-s1" onclick="toggleNode('slave1')" class="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 font-medium font-medium">ONLINE</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive Visualizer -->
+        <div class="lg:col-span-3 flex flex-col gap-6">
+            
+            <!-- Network Topology Mapping -->
+            <div class="bg-slate-950/40 border border-slate-800 rounded-2xl p-6 relative flex-1 min-h-[400px] flex flex-col justify-between">
+                <div class="absolute top-4 left-4">
+                    <span id="active-mode-badge" class="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs px-3 py-1 rounded-full font-semibold">
+                        MODE: Master-Slave (Sync)
+                    </span>
+                </div>
+
+                <div class="absolute top-4 right-4 text-xs text-slate-400 flex gap-4">
+                    <span><i class="fa-solid fa-circle text-emerald-500 mr-1.5"></i> Online</span>
+                    <span><i class="fa-solid fa-circle text-rose-500 mr-1.5"></i> Offline / Crash</span>
+                    <span><i class="fa-solid fa-arrows-spin text-amber-500 animate-spin mr-1.5"></i> Syncing</span>
+                </div>
+
+                <!-- Canvas Grid for Nodes -->
+                <div class="flex-1 flex items-center justify-around relative my-12">
+                    
+                    <!-- SVG lines connector -->
+                    <svg class="absolute inset-0 w-full h-full pointer-events-none z-0" id="network-svg">
+                        <!-- Left-to-Right / Top-to-Bottom connection lines dynamically targeted via JS -->
+                        <path id="path-m1-s1" d="M 350 180 L 750 100" stroke="#334155" stroke-width="3" fill="none" />
+                        <path id="path-m1-s2" d="M 350 220 L 750 300" stroke="#334155" stroke-width="3" fill="none" />
+                        <path id="path-m1-m2" d="M 300 200 L 900 200" stroke="#334155" stroke-width="3" stroke-dasharray="8" fill="none" class="hidden" />
+                    </svg>
+
+                    <!-- Client Application -->
+                    <div class="flex flex-col items-center gap-2 z-10">
+                        <div class="w-16 h-16 bg-slate-800 border-2 border-slate-600 rounded-2xl flex items-center justify-center text-slate-300 shadow-xl">
+                            <i class="fa-solid fa-laptop-code text-2xl"></i>
+                        </div>
+                        <div class="text-center">
+                            <div class="font-bold text-xs">Client Apps</div>
+                            <div class="text-[10px] text-slate-400">Requesting Writes/Reads</div>
+                        </div>
+                    </div>
+
+                    <!-- Database Nodes Column -->
+                    <div class="flex flex-col gap-12 z-10 w-full max-w-4xl justify-around md:flex-row">
+                        
+                        <!-- Master Node 1 -->
+                        <div id="node-master1" class="bg-slate-900 border-2 border-indigo-500 rounded-xl p-4 w-60 shadow-2xl transition duration-300">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs bg-indigo-500/20 text-indigo-300 px-2.5 py-0.5 rounded font-bold uppercase tracking-wider">MASTER 1</span>
+                                <span id="status-master1" class="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online
+                                </span>
+                            </div>
+                            <div class="text-center py-2 border-b border-slate-800">
+                                <i class="fa-solid fa-server text-3xl text-indigo-400"></i>
+                            </div>
+                            <div class="mt-3">
+                                <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Tabel Database:</div>
+                                <div class="bg-slate-950 p-2 rounded mt-1 text-xs code-font flex justify-between">
+                                    <span class="text-slate-400">stok_laptop:</span>
+                                    <span id="data-m1" class="text-indigo-300 font-bold">10</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Master Node 2 (Initially Hidden unless in MM Mode) -->
+                        <div id="node-master2" class="bg-slate-900 border-2 border-slate-800 rounded-xl p-4 w-60 shadow-2xl transition duration-300 hidden opacity-40">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded font-bold uppercase tracking-wider">MASTER 2</span>
+                                <span id="status-master2" class="text-xs text-slate-400 font-semibold flex items-center gap-1">
+                                    <span class="w-2 h-2 rounded-full bg-slate-500"></span> Offline
+                                </span>
+                            </div>
+                            <div class="text-center py-2 border-b border-slate-800">
+                                <i class="fa-solid fa-server text-3xl text-amber-400"></i>
+                            </div>
+                            <div class="mt-3">
+                                <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Tabel Database:</div>
+                                <div class="bg-slate-950 p-2 rounded mt-1 text-xs code-font flex justify-between">
+                                    <span class="text-slate-400">stok_laptop:</span>
+                                    <span id="data-m2" class="text-amber-300 font-bold">10</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Slave Node 1 -->
+                        <div id="node-slave1" class="bg-slate-900 border-2 border-emerald-600 rounded-xl p-4 w-60 shadow-2xl transition duration-300">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded font-bold uppercase tracking-wider">SLAVE 1</span>
+                                <span id="status-slave1" class="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online
+                                </span>
+                            </div>
+                            <div class="text-center py-2 border-b border-slate-800">
+                                <i class="fa-solid fa-database text-3xl text-emerald-400"></i>
+                            </div>
+                            <div class="mt-3">
+                                <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Tabel Database:</div>
+                                <div class="bg-slate-950 p-2 rounded mt-1 text-xs code-font flex justify-between">
+                                    <span class="text-slate-400">stok_laptop:</span>
+                                    <span id="data-s1" class="text-emerald-300 font-bold">10</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Simulation Info Panel -->
+                <div class="bg-slate-900/60 border border-slate-800/80 p-4 rounded-xl text-xs flex gap-4 items-start">
+                    <div class="bg-indigo-500/20 text-indigo-400 p-2 rounded-lg">
+                        <i class="fa-solid fa-circle-info text-base"></i>
+                    </div>
+                    <div>
+                        <div class="font-bold text-slate-300 text-sm mb-0.5" id="info-mode-title">Cara Kerja Master-Slave (Sinkron):</div>
+                        <p id="info-mode-desc" class="text-slate-400 leading-relaxed">
+                            Ketika Client menulis data ke Master DB, Master akan menginfokan ke Slave DB terlebih dahulu. Master akan "menahan" transaksi sukses sampai Slave DB mengonfirmasi (ACK) bahwa data telah tersimpan dengan aman. Hal ini menjamin tidak ada perbedaan data (*zero lag*), namun latency transaksi sedikit bertambah lambat.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terminal Live Logs -->
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col h-56">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Live Logs & Process Simulation</h3>
+                    </div>
+                    <button onclick="clearLogs()" class="text-xs text-slate-500 hover:text-slate-300">
+                        <i class="fa-solid fa-trash-can mr-1"></i> Clear Logs
+                    </button>
+                </div>
+                <!-- Real logs display container -->
+                <div id="logs-container" class="flex-1 overflow-y-auto code-font text-xs text-emerald-400/90 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-800 pr-2">
+                    <div class="text-slate-500">[System] Simulator diinisialisasi. Menunggu operasi...</div>
+                    <div class="text-slate-500">[System] Replikasi diatur ke Sinkronous. Jalur replikasi aktif: Master 1 ➔ Slave 1.</div>
+                </div>
+            </div>
+            
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-950/20 px-6 py-4 text-center text-xs text-slate-500">
+        Tugas4 Fikran 105841119623 RPL-6B
+    </footer>
+
+    <!-- Interactive JS Script Simulation -->
+    <script>
+        // Global State
+        let currentMode = 'ms-sync'; // 'ms-sync', 'ms-async', 'mm-async'
+        let lagValue = 1.5; // seconds
+        
+        let dbState = {
+            master1: { online: true, data: { stok_laptop: 10 } },
+            master2: { online: false, data: { stok_laptop: 10 } },
+            slave1: { online: true, data: { stok_laptop: 10 } }
+        };
+
+        // DOM elements cache
+        const logsContainer = document.getElementById('logs-container');
+        const activeModeBadge = document.getElementById('active-mode-badge');
+        const infoModeTitle = document.getElementById('info-mode-title');
+        const infoModeDesc = document.getElementById('info-mode-desc');
+        const pathM1S1 = document.getElementById('path-m1-s1');
+        const pathM1M2 = document.getElementById('path-m1-m2');
+        const writeTarget = document.getElementById('write-target');
+        const controlM2 = document.getElementById('control-m2');
+        const btnToggleM2 = document.getElementById('btn-toggle-m2');
+
+        // Initial setup on window load
+        window.onload = function() {
+            recalculatePaths();
+            window.addEventListener('resize', recalculatePaths);
+        };
+
+        function recalculatePaths() {
+            // Recalculate dynamic SVG lines connecting the nodes
+            const nodeM1 = document.getElementById('node-master1');
+            const nodeM2 = document.getElementById('node-master2');
+            const nodeS1 = document.getElementById('node-slave1');
+
+            if (!nodeM1 || !nodeS1) return;
+
+            const rM1 = nodeM1.getBoundingClientRect();
+            const rM2 = nodeM2.getBoundingClientRect();
+            const rS1 = nodeS1.getBoundingClientRect();
+            const parent = document.getElementById('network-svg').getBoundingClientRect();
+
+            // Setup path elements
+            const x1 = rM1.left + rM1.width - parent.left;
+            const y1 = rM1.top + (rM1.height / 2) - parent.top;
+            
+            const xS1_left = rS1.left - parent.left;
+            const yS1_mid = rS1.top + (rS1.height / 2) - parent.top;
+
+            pathM1S1.setAttribute('d', `M ${x1} ${y1} L ${xS1_left} ${yS1_mid}`);
+
+            if (currentMode === 'mm-async') {
+                const xM2_left = rM2.left - parent.left;
+                const yM2_mid = rM2.top + (rM2.height / 2) - parent.top;
+                pathM1M2.setAttribute('d', `M ${x1} ${y1} L ${xM2_left} ${yM2_mid}`);
+            }
+        }
+
+        function addLog(text, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            let colorClass = 'text-slate-400';
+            if (type === 'success') colorClass = 'text-emerald-400';
+            if (type === 'warn') colorClass = 'text-amber-400 font-semibold';
+            if (type === 'error') colorClass = 'text-rose-400 font-bold';
+            if (type === 'client') colorClass = 'text-sky-300';
+            if (type === 'replication') colorClass = 'text-indigo-300';
+
+            const logEl = document.createElement('div');
+            logEl.className = `${colorClass}`;
+            logEl.innerHTML = `<span class="text-slate-600">[${time}]</span> ${text}`;
+            logsContainer.appendChild(logEl);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+
+        function clearLogs() {
+            logsContainer.innerHTML = '<div class="text-slate-500">[System] Logs dibersihkan. Menunggu aktivitas baru...</div>';
+        }
+
+        function updateLagLabel(val) {
+            lagValue = parseFloat(val);
+            document.getElementById('lag-val').innerText = `${lagValue.toFixed(1)} detik`;
+        }
+
+        // Switch modes (Synchronous vs Asynchronous vs Master-Master)
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            // Remove active classes
+            document.getElementById('btn-ms-sync').className = "w-full text-left p-3 rounded-xl border border-slate-800 hover:border-slate-700 transition flex items-start gap-3 text-slate-300";
+            document.getElementById('btn-ms-async').className = "w-full text-left p-3 rounded-xl border border-slate-800 hover:border-slate-700 transition flex items-start gap-3 text-slate-300";
+            document.getElementById('btn-mm-async').className = "w-full text-left p-3 rounded-xl border border-slate-800 hover:border-slate-700 transition flex items-start gap-3 text-slate-300";
+
+            const activeBtn = document.getElementById(`btn-${mode}`);
+            activeBtn.className = "w-full text-left p-3 rounded-xl border transition flex items-start gap-3 bg-indigo-600/10 border-indigo-500 text-indigo-300";
+
+            const nodeM2 = document.getElementById('node-master2');
+
+            if (mode === 'ms-sync') {
+                activeModeBadge.innerText = "MODE: Master-Slave (Sync)";
+                infoModeTitle.innerText = "Cara Kerja Master-Slave (Sinkron):";
+                infoModeDesc.innerText = "Ketika Client menulis data ke Master DB, Master akan menahan respons sukses untuk client sampai semua Slave DB mengonfirmasi (ACK) bahwa replika data sudah tertulis dengan aman. Menjamin konsistensi 100% di semua node tapi meningkatkan latency.";
+                nodeM2.classList.add('hidden');
+                pathM1M2.classList.add('hidden');
+                
+                // Reset Master 2 settings
+                dbState.master2.online = false;
+                controlM2.classList.add('opacity-40', 'pointer-events-none');
+                btnToggleM2.className = "px-2 py-1 rounded bg-slate-800 text-slate-400 hover:bg-slate-700 font-medium";
+                btnToggleM2.innerText = "OFFLINE";
+                writeTarget.value = "master1";
+                writeTarget.options[1].disabled = true;
+
+                addLog("[Mode] Mengubah konfigurasi replikasi ke Master-Slave (Synchronous).", 'info');
+            } else if (mode === 'ms-async') {
+                activeModeBadge.innerText = "MODE: Master-Slave (Async)";
+                infoModeTitle.innerText = "Cara Kerja Master-Slave (Asinkron):";
+                infoModeDesc.innerText = "Client menulis ke Master, Master menyimpannya secara lokal dan instan mengembalikan pesan 'Sukses'. Replikasi ke Slave dilakukan di background. Jika client langsung membaca dari Slave sesaat setelah menulis, ada potensi mendapatkan data usang (Eventual Consistency).";
+                nodeM2.classList.add('hidden');
+                pathM1M2.classList.add('hidden');
+
+                // Reset Master 2 settings
+                dbState.master2.online = false;
+                controlM2.classList.add('opacity-40', 'pointer-events-none');
+                btnToggleM2.className = "px-2 py-1 rounded bg-slate-800 text-slate-400 hover:bg-slate-700 font-medium";
+                btnToggleM2.innerText = "OFFLINE";
+                writeTarget.value = "master1";
+                writeTarget.options[1].disabled = true;
+
+                addLog("[Mode] Mengubah konfigurasi replikasi ke Master-Slave (Asynchronous).", 'info');
+            } else if (mode === 'mm-async') {
+                activeModeBadge.innerText = "MODE: Master-Master (Async)";
+                infoModeTitle.innerText = "Cara Kerja Master-Master (Asinkron):";
+                infoModeDesc.innerText = "Kedua server berfungsi sebagai Master dan melayani operasi Baca & Tulis secara bersamaan. Sinkronisasi data dilakukan bolak-balik di latar belakang. Sangat baik untuk ketersediaan tinggi, tetapi rawan terjadi konflik data apabila kunci yang sama di-update di kedua server secara bersamaan.";
+                nodeM2.classList.remove('hidden');
+                pathM1M2.classList.remove('hidden');
+
+                // Enable Master 2 settings
+                dbState.master2.online = true;
+                controlM2.classList.remove('opacity-40', 'pointer-events-none');
+                document.getElementById('status-master2').innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online`;
+                btnToggleM2.className = "px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 font-medium";
+                btnToggleM2.innerText = "ONLINE";
+                writeTarget.options[1].disabled = false;
+
+                addLog("[Mode] Mengubah konfigurasi replikasi ke Master-Master (Asynchronous). Node Master 2 diaktifkan.", 'info');
+            }
+
+            // Redraw path SVG connectors
+            setTimeout(recalculatePaths, 100);
+        }
+
+        // Toggle Server state (Crash / Online simulation)
+        function toggleNode(node) {
+            const btn = document.getElementById(`btn-toggle-${node === 'master1' ? 'm1' : (node === 'master2' ? 'm2' : 's1')}`);
+            const statusEl = document.getElementById(`status-${node === 'master1' ? 'master1' : (node === 'master2' ? 'master2' : 'slave1')}`);
+            const cardEl = document.getElementById(`node-${node === 'master1' ? 'master1' : (node === 'master2' ? 'master2' : 'slave1')}`);
+
+            if (dbState[node].online) {
+                // Crash the node
+                dbState[node].online = false;
+                btn.className = "px-2 py-1 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 font-medium";
+                btn.innerText = "CRASHED";
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span> Offline`;
+                cardEl.classList.add('opacity-40', 'border-rose-500');
+                cardEl.classList.remove('border-indigo-500', 'border-emerald-600', 'border-amber-500');
+                addLog(`[System] Server ${node.toUpperCase()} mengalami kerusakan / mati (CRASHED)!`, 'error');
+            } else {
+                // Bring back online
+                dbState[node].online = true;
+                btn.className = "px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 font-medium";
+                btn.innerText = "ONLINE";
+                
+                let themeBorder = 'border-indigo-500';
+                if (node === 'slave1') themeBorder = 'border-emerald-600';
+                if (node === 'master2') themeBorder = 'border-amber-500';
+
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online`;
+                cardEl.classList.remove('opacity-40', 'border-rose-500');
+                cardEl.classList.add(themeBorder);
+                addLog(`[System] Server ${node.toUpperCase()} kembali online. Memulihkan status...`, 'success');
+            }
+        }
+
+        // Execute Write Transcation
+        function executeWrite() {
+            const targetNode = document.getElementById('write-target').value;
+            const key = document.getElementById('write-key').value;
+            const val = parseInt(document.getElementById('write-value').value);
+
+            addLog(`[Client] Mengirim request tulis: { ${key}: ${val} } ke server target ${targetNode.toUpperCase()}...`, 'client');
+
+            // 1. Check if the target node is online
+            if (!dbState[targetNode].online) {
+                addLog(`[Client Error] Transaksi gagal! Target Server ${targetNode.toUpperCase()} sedang offline / mati.`, 'error');
+                return;
+            }
+
+            // Block visual animations during replication
+            const activePath = targetNode === 'master1' ? pathM1S1 : null;
+
+            if (currentMode === 'ms-sync') {
+                // SYNCHRONOUS FLOW
+                addLog(`[${targetNode.toUpperCase()}] Memulai transaksi sinkronous. Menunggu respons Slave...`, 'info');
+                
+                // Show replicating animation link
+                pathM1S1.setAttribute('stroke', '#f59e0b');
+                pathM1S1.classList.add('replicating-path');
+
+                setTimeout(() => {
+                    if (dbState.slave1.online) {
+                        // Slave active -> Saves data -> ACK to master
+                        dbState.slave1.data[key] = val;
+                        document.getElementById('data-s1').innerText = val;
+                        addLog(`[SLAVE 1] Mengonfirmasi data tersimpan secara lokal (ACK).`, 'success');
+                        
+                        // Master commits locally
+                        dbState.master1.data[key] = val;
+                        document.getElementById('data-m1').innerText = val;
+                        addLog(`[MASTER 1] Commit sukses! Data berhasil diamankan di Master dan Slave.`, 'success');
+                        addLog(`[Client] Transaksi Berhasil! Respons diterima dalam waktu ~${(lagValue + 0.1).toFixed(2)}s (Strong Consistency).`, 'success');
+                    } else {
+                        // Slave is dead during a Sync replication
+                        addLog(`[MASTER 1] Gagal melakukan replikasi! SLAVE 1 tidak merespons (Offline).`, 'error');
+                        addLog(`[Client Error] Transaksi ditolak oleh Master karena jaminan Sync gagal terpenuhi.`, 'error');
+                    }
+                    
+                    // Reset paths
+                    pathM1S1.setAttribute('stroke', '#334155');
+                    pathM1S1.classList.remove('replicating-path');
+                }, lagValue * 1000);
+
+            } else if (currentMode === 'ms-async') {
+                // ASYNCHRONOUS FLOW
+                // Master saves instantly
+                dbState.master1.data[key] = val;
+                document.getElementById('data-m1').innerText = val;
+                addLog(`[MASTER 1] Menyimpan data secara lokal instan (0.01 detik).`, 'success');
+                addLog(`[Client] Transaksi Berhasil! Status: SUKSES (Eventual Consistency).`, 'success');
+
+                // Replication starts in background
+                addLog(`[Replication Engine] Memulai push data ke Slave di latar belakang...`, 'replication');
+                pathM1S1.setAttribute('stroke', '#818cf8');
+                pathM1S1.classList.add('replicating-path');
+
+                setTimeout(() => {
+                    if (dbState.slave1.online) {
+                        dbState.slave1.data[key] = val;
+                        document.getElementById('data-s1').innerText = val;
+                        addLog(`[SLAVE 1] Replikasi background selesai. Data sinkron.`, 'success');
+                    } else {
+                        addLog(`[Replication Warning] Gagal mereplikasi data ke SLAVE 1 karena server offline. Antrean replikasi ditahan (lagging).`, 'warn');
+                    }
+                    
+                    // Reset path style
+                    pathM1S1.setAttribute('stroke', '#334155');
+                    pathM1S1.classList.remove('replicating-path');
+                }, lagValue * 1000);
+
+            } else if (currentMode === 'mm-async') {
+                // MASTER-MASTER FLOW (Asynchronous bidirectional repliation)
+                const sourceNode = targetNode;
+                const replicaNode = targetNode === 'master1' ? 'master2' : 'master1';
+
+                dbState[sourceNode].data[key] = val;
+                document.getElementById(sourceNode === 'master1' ? 'data-m1' : 'data-m2').innerText = val;
+
+                addLog(`[${sourceNode.toUpperCase()}] Transaksi lokal sukses disimpan.`, 'success');
+                addLog(`[Client] Respons dikembalikan dalam ~0.02 detik.`, 'success');
+
+                // Trigger background replication to secondary master
+                addLog(`[Replication Engine] Mengirim perubahan dari ${sourceNode.toUpperCase()} ke ${replicaNode.toUpperCase()}...`, 'replication');
+                pathM1M2.setAttribute('stroke', '#f59e0b');
+                pathM1M2.classList.add('replicating-path');
+
+                setTimeout(() => {
+                    if (dbState[replicaNode].online) {
+                        // Check for data conflict simulation (e.g. if the user tried to change same key during sync window)
+                        dbState[replicaNode].data[key] = val;
+                        document.getElementById(replicaNode === 'master1' ? 'data-m1' : 'data-m2').innerText = val;
+                        addLog(`[${replicaNode.toUpperCase()}] Sinkronisasi data dari ${sourceNode.toUpperCase()} berhasil.`, 'success');
+                    } else {
+                        addLog(`[Replication Warning] Gagal mereplikasi ke ${replicaNode.toUpperCase()} (Node Offline). Log perubahan disimpan dalam tabel antrean.`, 'warn');
+                    }
+
+                    pathM1M2.setAttribute('stroke', '#334155');
+                    pathM1M2.classList.remove('replicating-path');
+                }, lagValue * 1000);
+            }
+        }
+    </script>
+</body>
+</html>
+```eof
+
+
