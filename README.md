@@ -1,6 +1,9 @@
 # DB-ReplicaSim 🖥️🔋
 > **Project Simulasi Replikasi Database Interaktif**  
-> Tugas Kelompok 5 - Mata Kuliah Sistem Terdistribusi (2026)
+> Tugas 4 - Mata Kuliah Scalable Systems Design(2026)
+> Nama: Fikran
+> Nim: 105841119623
+> Kelas: RPL-6B
 
 **DB-ReplicaSim** adalah sebuah aplikasi simulator berbasis web interaktif yang dirancang untuk memvisualisasikan bagaimana mekanisme **Database Replication** bekerja pada sistem terdistribusi. Alat peraga edukatif ini mensimulasikan aliran data secara *real-time*, waktu respons (latensi), dampak gangguan jaringan (*replication lag*), hingga skenario kegagalan server (*node crash*).
 
@@ -44,15 +47,4 @@ Project ini tidak memerlukan proses instalasi server lokal (seperti XAMPP, Node.
 3. Klik dua kali (*double-click*) file tersebut untuk membukanya di Google Chrome, Edge, Firefox, atau Safari.
 
 ---
-
-## 👥 Anggota Kelompok 5
-
-* **Muhammad Faizal**
-* **Hafifa Mulyana**
-* **Siti Nurmaniah**
-* **Fadlurrahman Rivai**
-* **Nawat Sakti**
-* **Muh. Aryo Zakaria**
-
----
-*Project ini dibuat untuk memenuhi tugas akademik pada Program Studi Teknik Informatika / Sistem Informasi.*
+*Project ini dibuat untuk memenuhi tugas akademik pada Program Studi Teknik Informatika.*
